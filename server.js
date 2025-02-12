@@ -28,7 +28,7 @@ function createBot() {
             host: "Foca132.aternos.me",
         port: 19003,
         username: "o7patrocina",
-        version: false,
+        version: '1.21.4',
         plugins: [AutoAuth],
         AutoAuth: "bot112022"
         });
