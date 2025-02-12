@@ -19,39 +19,59 @@ app.use(express.static("public"));
 // Criar o bot Minecraft quando o usuário clicar no botão no site
 function createBot() {
     if (bot) {
-        return; // Se o bot já estiver rodando, não cria outro
+        bot.quit(); // Se o bot já estiver rodando, desconecta antes de criar um novo
+        bot = null;
     }
 
-    bot = mineflayer.createBot({
-        host: "Foca132.aternos.me",
+    setTimeout(() => {
+        bot = mineflayer.createBot({
+            host: "Foca132.aternos.me",
         port: 19003,
         username: "o7patrocina",
         version: false,
         plugins: [AutoAuth],
         AutoAuth: "bot112022"
-    });
+        });
 
-    bot.loadPlugin(pvp);
-    bot.loadPlugin(armorManager);
-    bot.loadPlugin(pathfinder);
+        bot.loadPlugin(pvp);
+        bot.loadPlugin(armorManager);
+        bot.loadPlugin(pathfinder);
 
-    bot.on("chat", (username, message) => {
-        io.emit("chatMessage", { username, message });
-    });
+        // Evita kick por inatividade
+        bot.on("spawn", () => {
+            setInterval(() => {
+                if (bot) {
+                    bot.setControlState("jump", true);
+                    setTimeout(() => bot.setControlState("jump", false), 500);
+                }
+            }, 30000); // A cada 30 segundos
+        });
 
-    bot.on("kicked", (reason) => {
-        console.log("Bot foi expulso:", reason);
-        bot = null;
-    });
+        bot.on("chat", (username, message) => {
+            io.emit("chatMessage", { username, message });
+        });
 
-    bot.on("error", (err) => {
-        console.error("Erro no bot:", err);
-    });
+        bot.on("kicked", (reason) => {
+            console.log("Bot foi expulso:", reason);
+            reconnect();
+        });
 
-    bot.on("end", () => {
-        console.log("Bot desconectado.");
-        bot = null;
-    });
+        bot.on("error", (err) => {
+            console.error("Erro no bot:", err);
+            reconnect();
+        });
+
+        bot.on("end", () => {
+            console.log("Bot desconectado.");
+            reconnect();
+        });
+    }, 5000); // Aguarda 5 segundos antes de criar um novo bot
+}
+
+// Tenta reconectar o bot automaticamente
+function reconnect() {
+    console.log("Tentando reconectar em 10 segundos...");
+    setTimeout(createBot, 10000);
 }
 
 // Comando para parar o bot
