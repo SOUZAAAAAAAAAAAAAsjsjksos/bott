@@ -19,18 +19,18 @@ app.use(express.static("public"));
 // Criar o bot Minecraft quando o usuário clicar no botão no site
 function createBot() {
     if (bot) {
-        bot.quit(); // Se o bot já estiver rodando, desconecta antes de criar um novo
+        bot.end(); // Se o bot já estiver rodando, desconecta antes de criar um novo
         bot = null;
     }
 
     setTimeout(() => {
         bot = mineflayer.createBot({
             host: "Foca132.aternos.me",
-        port: 19003,
-        username: "o7patrocina",
-        version: '1.21.4',
-        plugins: [AutoAuth],
-        AutoAuth: "bot112022"
+            port: 19003,
+            username: "o7patrocina",
+            version: '1.21.4',
+            plugins: [AutoAuth],
+            AutoAuth: "bot112022"
         });
 
         bot.loadPlugin(pvp);
@@ -77,7 +77,7 @@ function reconnect() {
 // Comando para parar o bot
 function stopBot() {
     if (bot) {
-        bot.quit();
+        bot.end(); // Usa 'bot.end()' para desconectar o bot
         bot = null;
     }
 }
