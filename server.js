@@ -23,8 +23,8 @@ function createBot() {
     }
 
     bot = mineflayer.createBot({
-        host: "104.234.63.158",
-        port: 25565,
+        host: "Foca132.aternos.me",
+        port: 19003,
         username: "o7patrocina",
         version: false,
         plugins: [AutoAuth],
