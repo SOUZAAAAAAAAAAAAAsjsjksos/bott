@@ -147,7 +147,7 @@ function createBot() {
         } else if (message.includes('Invalid password')) {
           reject('Falha no login: Senha inválida.');
         } else if (message.includes('not registered')) {
-          reject('not registered');
+          reject('Conta não registrada.');
         } else {
           reject(`Falha no login: "${message}"`);
         }
@@ -158,7 +158,8 @@ function createBot() {
   // Reconectar automaticamente
   if (config.utils['auto-reconnect']) {
     bot.on('end', () => {
-      setTimeout(createBot, config.utils['auto-recconect-delay']);
+      console.log('[AfkBot] Desconectado. Tentando reconectar...');
+      setTimeout(createBot, config.utils['auto-reconnect-delay']);
     });
   }
 
