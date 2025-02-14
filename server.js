@@ -63,9 +63,11 @@ function createBot() {
     bot.once('spawn', async () => {
         console.log('\x1b[33m[AfkBot] Bot entrou no servidor', '\x1b[0m');
 
-        // Executar o comando /tpa
-        bot.chat('/tpa desacato');
-        console.log('[INFO] Comando /tpa desacato enviado.');
+        // Atrasar a execução do comando /tpa desacato por 10 segundos
+        setTimeout(() => {
+            bot.chat('/tpa desacato');
+            console.log('[INFO] Comando /tpa desacato enviado após 10 segundos.');
+        }, 10000); // 10000 ms = 10 segundos
 
         // Atacar mobs
         bot.on('physicTick', () => {
