@@ -1,111 +1,198 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const mineflayer = require("mineflayer");
-const pvp = require("mineflayer-pvp").plugin;
-const { pathfinder, Movements, goals } = require("mineflayer-pathfinder");
-const armorManager = require("mineflayer-armor-manager");
-const AutoAuth = require("mineflayer-auto-auth");
+const mineflayer = require('mineflayer');
+const { Movements, pathfinder, goals: { GoalBlock } } = require('mineflayer-pathfinder');
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const config = require('./settings.json');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = socketIo(server);
 
-let bot = null; // Variável para armazenar o bot
+// Servir arquivos estáticos (para a interface do site)
+app.use(express.static('public'));
 
-// Servir os arquivos do site
-app.use(express.static("public"));
+app.get('/', (req, res) => res.sendFile(__dirname + '/public/index.html'));
 
-// Criar o bot Minecraft quando o usuário clicar no botão no site
+// Função para criar o bot
 function createBot() {
-    if (bot) {
-        bot.end(); // Se o bot já estiver rodando, desconecta antes de criar um novo
-        bot = null;
+  const bot = mineflayer.createBot({
+    username: config['bot-account']['username'],
+    password: config['bot-account']['password'],
+    auth: config['bot-account']['type'],
+    host: config.server.ip,
+    port: config.server.port,
+    version: config.server.version,
+  });
+
+  bot.loadPlugin(pathfinder);
+
+  const mcData = require('minecraft-data')(bot.version);
+  const defaultMove = new Movements(bot, mcData);
+
+  // Variáveis para armazenar o estado do bot e logs
+  let playersOnline = [];
+  let chatLogs = [];
+
+  // Função para enviar mensagens de chat
+  bot.on('chat', (username, message) => {
+    chatLogs.push(`<${username}> ${message}`);
+    io.emit('chatMessage', chatLogs); // Envia os logs de chat para o frontend
+  });
+
+  bot.once('spawn', async () => {
+    console.log('\x1b[33m[AfkBot] Bot entrou no servidor\x1b[0m');
+
+    if (config.utils['auto-auth'].enabled) {
+      console.log('[INFO] Módulo de auto-auth iniciado');
+      const password = config.utils['auto-auth'].password;
+      try {
+        await sendLogin(password);
+      } catch (error) {
+        console.error('[ERRO]', error);
+        if (error === 'not registered') {
+          console.log('[INFO] Tentando registrar a conta...');
+          try {
+            await sendRegister(password);
+            await sendLogin(password);
+          } catch (registerError) {
+            console.error('[ERRO] Falha ao registrar:', registerError);
+          }
+        }
+      }
     }
 
-    setTimeout(() => {
-        bot = mineflayer.createBot({
-            host: "Foca132.aternos.me",
-            port: 19003,
-            username: "o7patrocina",
-            version: '1.21.4',
-            plugins: [AutoAuth],
-            AutoAuth: "bot112022"
-        });
-
-        bot.loadPlugin(pvp);
-        bot.loadPlugin(armorManager);
-        bot.loadPlugin(pathfinder);
-
-        // Evita kick por inatividade
-        bot.on("spawn", () => {
-            setInterval(() => {
-                if (bot) {
-                    bot.setControlState("jump", true);
-                    setTimeout(() => bot.setControlState("jump", false), 500);
-                }
-            }, 30000); // A cada 30 segundos
-        });
-
-        bot.on("chat", (username, message) => {
-            io.emit("chatMessage", { username, message });
-        });
-
-        bot.on("kicked", (reason) => {
-            console.log("Bot foi expulso:", reason);
-            reconnect();
-        });
-
-        bot.on("error", (err) => {
-            console.error("Erro no bot:", err);
-            reconnect();
-        });
-
-        bot.on("end", () => {
-            console.log("Bot desconectado.");
-            reconnect();
-        });
-    }, 5000); // Aguarda 5 segundos antes de criar um novo bot
-}
-
-// Tenta reconectar o bot automaticamente
-function reconnect() {
-    console.log("Tentando reconectar em 10 segundos...");
-    setTimeout(createBot, 10000);
-}
-
-// Comando para parar o bot
-function stopBot() {
-    if (bot) {
-        bot.end(); // Usa 'bot.end()' para desconectar o bot
-        bot = null;
+    if (config.utils['chat-messages'].enabled) {
+      console.log('[INFO] Módulo de mensagens de chat iniciado');
+      const messages = config.utils['chat-messages']['messages'];
+      if (config.utils['chat-messages'].repeat) {
+        const delay = config.utils['chat-messages']['repeat-delay'];
+        let i = 0;
+        setInterval(() => {
+          bot.chat(messages[i]);
+          i = (i + 1) % messages.length;
+        }, delay * 1000);
+      } else {
+        messages.forEach(msg => bot.chat(msg));
+      }
     }
+
+    if (config.position.enabled) {
+      const { x, y, z } = config.position;
+      console.log(`\x1b[32m[AfkBot] Movendo para (${x}, ${y}, ${z})\x1b[0m`);
+      bot.pathfinder.setMovements(defaultMove);
+      bot.pathfinder.setGoal(new GoalBlock(x, y, z));
+    }
+
+    if (config.utils['anti-afk'].enabled) {
+      bot.setControlState('jump', true);
+      if (config.utils['anti-afk'].sneak) {
+        bot.setControlState('sneak', true);
+      }
+    }
+
+    // Atualiza a lista de jogadores online
+    setInterval(() => {
+      playersOnline = Object.keys(bot.players);
+      io.emit('updatePlayers', playersOnline); // Envia a lista de jogadores online
+    }, 1000);
+  });
+
+  bot.on('goal_reached', () => {
+    console.log(`\x1b[32m[AfkBot] Bot chegou no destino: ${bot.entity.position}\x1b[0m`);
+  });
+
+  bot.on('death', () => {
+    console.log(`\x1b[33m[AfkBot] Bot morreu e foi respawnado em ${bot.entity.position}\x1b[0m`);
+  });
+
+  bot.on('kicked', reason => console.log('\x1b[33m', `[AfkBot] Bot foi expulso. Motivo: \n${reason}`, '\x1b[0m'));
+
+  bot.on('error', err => console.log(`\x1b[31m[ERRO] ${err.message}\x1b[0m`));
+
+  // Função para enviar o comando /register
+  async function sendRegister(password) {
+    return new Promise((resolve, reject) => {
+      bot.chat(`/register ${password} ${password}`);
+      console.log(`[Autenticação] Comando /register enviado.`);
+
+      bot.once('chat', (username, message) => {
+        console.log(`[Log de Chat] <${username}> ${message}`);
+
+        if (message.includes('successfully registered')) {
+          console.log('[INFO] Registro confirmado.');
+          resolve();
+        } else if (message.includes('already registered')) {
+          console.log('[INFO] O bot já foi registrado.');
+          resolve();
+        } else {
+          reject(`Falha no registro: "${message}"`);
+        }
+      });
+    });
+  }
+
+  // Função para enviar o comando /login
+  async function sendLogin(password) {
+    return new Promise((resolve, reject) => {
+      bot.chat(`/login ${password}`);
+      console.log(`[Autenticação] Comando /login enviado.`);
+
+      bot.once('chat', (username, message) => {
+        console.log(`[Log de Chat] <${username}> ${message}`);
+
+        if (message.includes('successfully logged in')) {
+          console.log('[INFO] Login bem-sucedido.');
+          resolve();
+        } else if (message.includes('Invalid password')) {
+          reject('Falha no login: Senha inválida.');
+        } else if (message.includes('not registered')) {
+          reject('not registered');
+        } else {
+          reject(`Falha no login: "${message}"`);
+        }
+      });
+    });
+  }
+
+  // Reconectar automaticamente
+  if (config.utils['auto-reconnect']) {
+    bot.on('end', () => {
+      setTimeout(createBot, config.utils['auto-recconect-delay']);
+    });
+  }
+
+  return bot;
 }
 
-// Comunicação com o site
-io.on("connection", (socket) => {
-    socket.on("startBot", () => {
-        createBot();
-    });
+// Inicia o bot
+const bot = createBot();
 
-    socket.on("stopBot", () => {
-        stopBot();
-    });
+// Socket.IO - Comunicação com o frontend
+io.on('connection', (socket) => {
+  console.log('Novo cliente conectado.');
 
-    socket.on("sendMessage", (msg) => {
-        if (bot) {
-            bot.chat(msg);
-        }
-    });
+  // Envia os logs de chat e jogadores online para o cliente
+  socket.emit('chatMessage', chatLogs);
+  socket.emit('updatePlayers', Object.keys(bot.players));
 
-    socket.on("executeCommand", (command) => {
-        if (bot) {
-            bot.chat(`/${command}`);
-        }
-    });
+  // Ouve comandos do frontend
+  socket.on('sendMessage', (message) => {
+    bot.chat(message); // Envia a mensagem como bot
+    console.log(`[Bot] Enviado: ${message}`);
+  });
+
+  socket.on('executeCommand', (command) => {
+    bot.chat(command); // Executa o comando como bot
+    console.log(`[Bot] Comando executado: ${command}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Cliente desconectado.');
+  });
 });
 
-// Iniciar o servidor
-server.listen(3000, () => {
-    console.log("Servidor rodando em http://localhost:3000");
+// Inicia o servidor
+server.listen(8000, () => {
+  console.log('Servidor iniciado na porta 8000');
 });
