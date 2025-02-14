@@ -32,7 +32,7 @@ function createBot() {
 
   // Variáveis para armazenar o estado do bot e logs
   let playersOnline = [];
-  let chatLogs = [];
+  let chatLogs = [];  // Garantindo que chatLogs esteja definida no escopo correto
 
   // Função para enviar mensagens de chat
   bot.on('chat', (username, message) => {
@@ -159,7 +159,7 @@ function createBot() {
   if (config.utils['auto-reconnect']) {
     bot.on('end', () => {
       console.log('[AfkBot] Desconectado. Tentando reconectar...');
-      setTimeout(createBot, config.utils['auto-reconnect-delay']);
+      setTimeout(createBot, config.utils['auto-reconnect-delay'] || 20000); // Delay de 20 segundos para reconectar
     });
   }
 
