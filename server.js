@@ -21,52 +21,95 @@ function createBot() {
     const mcData = require('minecraft-data')(bot.version);
     const defaultMove = new Movements(bot, mcData);
 
+    async function sendRegister(password) {
+        return new Promise((resolve, reject) => {
+            bot.chat(`/register ${password} ${password}`);
+            console.log(`[Autenticação] Comando /register enviado.`);
+            bot.once('chat', (username, message) => {
+                console.log(`[Log de Chat] <${username}> ${message}`);
+                if (message.includes('successfully registered')) {
+                    console.log('[INFO] Registro confirmado.');
+                    resolve();
+                } else if (message.includes('already registered')) {
+                    console.log('[INFO] O bot já foi registrado.');
+                    resolve();
+                } else {
+                    reject(`Falha no registro: "${message}"`);
+                }
+            });
+        });
+    }
+
+    async function sendLogin(password) {
+        return new Promise((resolve, reject) => {
+            bot.chat(`/login ${password}`);
+            console.log(`[Autenticação] Comando /login enviado.`);
+            bot.once('chat', (username, message) => {
+                console.log(`[Log de Chat] <${username}> ${message}`);
+                if (message.includes('successfully logged in')) {
+                    console.log('[INFO] Login bem-sucedido.');
+                    resolve();
+                } else if (message.includes('Invalid password')) {
+                    reject('Falha no login: Senha inválida.');
+                } else if (message.includes('not registered')) {
+                    reject('not registered');
+                } else {
+                    reject(`Falha no login: "${message}"`);
+                }
+            });
+        });
+    }
+
     bot.once('spawn', async () => {
         console.log('\x1b[33m[AfkBot] Bot entrou no servidor', '\x1b[0m');
 
+        // Atrasar a execução do comando /tpa desacato por 10 segundos
         setTimeout(() => {
             bot.chat('/tpa desacato');
             console.log('[INFO] Comando /tpa desacato enviado após 10 segundos.');
-        }, 10000);
+        }, 10000); // 10000 ms = 10 segundos
 
-        // Função para encontrar comida no inventário
-        function getFood() {
-            const foodItems = [
-                'cooked_beef', 'cooked_porkchop', 'cooked_chicken', 
-                'bread', 'baked_potato', 'cooked_mutton', 'cooked_rabbit'
-            ];
-            return bot.inventory.items().find(item => foodItems.includes(item.name));
-        }
+        // Atacar mobs
+        bot.on('physicTick', () => {
+            const nearestMob = bot.nearestEntity(entity => entity.type === 'mob');
+            if (nearestMob) {
+                bot.attack(nearestMob);
+            }
+        });
 
-        // Sistema de Auto Eat (Comer quando estiver com fome)
-        bot.on('physicTick', async () => {
-            if (bot.food < 15) { // Come quando a barra de fome estiver abaixo de 15
-                const food = getFood();
-                if (food) {
+        if (config.utils['auto-auth'].enabled) {
+            console.log('[INFO] Módulo de auto-auth iniciado');
+            const password = config.utils['auto-auth'].password;
+            try {
+                await sendLogin(password);
+            } catch (error) {
+                console.error('[ERRO]', error);
+                if (error === 'not registered') {
+                    console.log('[INFO] Tentando registrar a conta...');
                     try {
-                        console.log(`[INFO] Bot está com fome! Comendo ${food.name}...`);
-                        await bot.equip(food, 'hand'); // Equipa a comida na mão
-                        await bot.consume(); // Come a comida
-                        console.log('[INFO] Bot comeu e está satisfeito.');
-
-                        // Voltar a segurar a espada de diamante após comer
-                        const sword = bot.inventory.items().find(item => item.name === 'diamond_sword');
-                        if (sword) {
-                            await bot.equip(sword, 'hand');
-                            console.log('[INFO] Espada de diamante equipada novamente.');
-                        }
-                    } catch (err) {
-                        console.log('[ERRO] Falha ao comer:', err);
+                        await sendRegister(password);
+                        await sendLogin(password);
+                    } catch (registerError) {
+                        console.error('[ERRO] Falha ao registrar:', registerError);
                     }
-                } else {
-                    console.log('[INFO] Bot está com fome, mas não tem comida.');
                 }
             }
+        }
 
-            // Atacar mobs se não estiver comendo
-            const nearestMob = bot.nearestEntity(entity => entity.type === 'mob');
-            if (nearestMob && bot.food >= 15) {
-                bot.attack(nearestMob);
+        // Pegar espada quando dropada
+        bot.on('itemSpawn', (item) => {
+            if (item.name === 'diamond_sword' || item.name === 'iron_sword' || item.name === 'stone_sword') {
+                console.log(`[INFO] Espada detectada: ${item.name}`);
+                bot.tossStack(item); // Descartar qualquer item indesejado
+
+                // Fazer o bot pegar o item e equipar a espada
+                bot.equip(item, 'hand', (err) => {
+                    if (err) {
+                        console.log('[ERRO] Não foi possível equipar a espada:', err);
+                    } else {
+                        console.log('[INFO] Espada equipada na mão.');
+                    }
+                });
             }
         });
 
