@@ -93,21 +93,6 @@ function createBot() {
             }
         }
 
-        // Pegar espada automaticamente
-        bot.on('itemSpawn', (item) => {
-            if (item.name.includes('sword')) {
-                console.log(`[INFO] Espada detectada: ${item.name}`);
-                bot.tossStack(item);
-
-                bot.equip(item, 'hand', (err) => {
-                    if (err) {
-                        console.log('[ERRO] Não foi possível equipar a espada:', err);
-                    } else {
-                        console.log('[INFO] Espada equipada na mão.');
-                    }
-                });
-            }
-        });
 
         // Enviar mensagens do Minecraft para a Webhook do Discord
         bot.on('chat', (username, message) => {
