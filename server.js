@@ -140,10 +140,11 @@ function createBot() {
 
     // Auto-reconnect
     if (config.utils['auto-reconnect']) {
-        bot.on('end', () => {
-            setTimeout(createBot, config.utils['auto-reconnect-delay']);
-        });
-    }
+    bot.on('end', () => {
+        console.log('[INFO] Bot desconectado. Tentando reconectar em 1 minuto...');
+        setTimeout(createBot, 60000); // 1 minuto (60 segundos)
+    });
+}
 
     bot.on('kicked', reason => console.log('\x1b[33m', `[AfkBot] Bot foi expulso. Motivo: \n${reason}`, '\x1b[0m'));
     bot.on('error', err => console.log(`\x1b[31m[ERRO] ${err.message}\x1b[0m`));
