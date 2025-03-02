@@ -2,7 +2,7 @@
 
   "bot-account": {
 
-    "username": "umseteum", 
+    "username": "d4rkz", 
 
     "password": "",
 
@@ -12,9 +12,9 @@
 
   "server": {
 
-    "ip": "Foca132.aternos.me", 
+    "ip": "jogar.spacecart.com.br", 
 
-    "port": 19003,   
+    "port": 28577,   
 
     "version": "1.12.1"   
 
@@ -46,9 +46,9 @@
 
     "anti-afk": {
 
-      "enabled": true,
+      "enabled": false,
 
-      "sneak": true
+      "sneak": false
 
     },
 
