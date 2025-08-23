@@ -2,7 +2,7 @@
 
   "bot-account": {
 
-    "username": "d4rkz", 
+    "username": "junindograu", 
 
     "password": "",
 
@@ -12,9 +12,9 @@
 
   "server": {
 
-    "ip": "sp-01.magnohost.com.br", 
+    "ip": "sp-09.magnohost.com.br", 
 
-    "port": 28577,   
+    "port": 25563,   
 
     "version": "1.21.4"   
 
