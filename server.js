@@ -1,6 +1,7 @@
 const mineflayer = require('mineflayer');
 const config = require('./settings.json');
 
+// Função para criar o bot
 function createBot() {
     const bot = mineflayer.createBot({
         username: config['bot-account']['username'],
@@ -37,3 +38,17 @@ function createBot() {
 }
 
 createBot();
+
+// --- Servidor HTTP para manter Web Service ativo ---
+const express = require("express");
+const app = express();
+
+const PORT = process.env.PORT || 3000;
+
+app.get("/", (req, res) => {
+    res.send("✅ AfkBot está rodando como Web Service!");
+});
+
+app.listen(PORT, () => {
+    console.log(`[AfkBot] Servidor web rodando na porta ${PORT}`);
+});
